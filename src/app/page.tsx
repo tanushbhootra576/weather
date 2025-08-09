@@ -57,7 +57,7 @@ export default function Home() {
    
 
     try {
-      const apiKey = 3574d83253a2553b034a5d84dac6506f;
+      const apiKey = "3574d83253a2553b034a5d84dac6506f";
       if (!apiKey) {
         throw new Error("OpenWeather API key not found.");
       }
