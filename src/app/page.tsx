@@ -13,11 +13,19 @@ import Image from 'next/image';
 
 type WeatherData = {
   city: string;
+  country: string;
   temperature: number;
   humidity: number;
   windSpeed: number;
   conditions: string;
   icon: string;
+  pressure: number;
+  visibility: number;
+  sunrise: number;
+  sunset: number;
+  feelsLike: number;
+  tempMin: number;
+  tempMax: number;
 };
 
 const WeatherCardSkeleton = () => (
@@ -57,7 +65,7 @@ export default function Home() {
    
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
+      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || (typeof window !== 'undefined' ? (window as any).NEXT_PUBLIC_OPENWEATHER_API_KEY : undefined);
       if (!apiKey) {
         throw new Error("OpenWeather API key not found.");
       }
@@ -70,24 +78,29 @@ export default function Home() {
         setLoading(false);
         return;
       }
-      
       const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json();
-        const message = errorData.message.charAt(0).toUpperCase() + errorData.message.slice(1);
+        const message = errorData.message?.charAt(0).toUpperCase() + errorData.message?.slice(1);
         throw new Error(message || 'City not found');
       }
       const data = await response.json();
-      
       const transformedData: WeatherData = {
         city: data.name,
+        country: data.sys?.country || '',
         temperature: Math.round(data.main.temp),
         humidity: data.main.humidity,
-        windSpeed: Math.round(data.wind.speed * 3.6), // m/s to km/h
+        windSpeed: Math.round(data.wind.speed * 3.6),
         conditions: data.weather[0]?.main || 'N/A',
-        icon: data.weather[0]?.icon
+        icon: data.weather[0]?.icon,
+        pressure: data.main.pressure,
+        visibility: data.visibility,
+        sunrise: data.sys.sunrise,
+        sunset: data.sys.sunset,
+        feelsLike: Math.round(data.main.feels_like),
+        tempMin: Math.round(data.main.temp_min),
+        tempMax: Math.round(data.main.temp_max),
       };
-
       setWeatherData(transformedData);
     } catch (error) {
       console.error("Failed to fetch weather:", error);
@@ -168,75 +181,92 @@ export default function Home() {
   }, [weatherBackgroundClass]);
 
   return (
-    <main className="flex min-h-screen w-full flex-col items-center p-4 pt-12 sm:p-8 sm:pt-24 transition-all duration-500">
-      <div className="w-full max-w-md space-y-8">
+    <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 pt-12 sm:p-8 sm:pt-24 transition-all duration-500 overflow-hidden">
+      {/* 3D Earth background placeholder */}
+      <div className="absolute inset-0 -z-10 flex items-center justify-center pointer-events-none">
+        {/* TODO: Replace with a real 3D Earth component, e.g. using react-three-fiber or a canvas animation */}
+        <div className="w-[600px] h-[600px] rounded-full bg-gradient-to-br from-blue-400 via-blue-700 to-indigo-900 opacity-40 blur-3xl animate-spin-slow shadow-2xl" />
+      </div>
+      <div className="w-full max-w-xl space-y-8">
         <header className="text-center">
-          <h1 className="text-5xl font-bold text-foreground drop-shadow-md">WeatherVerse</h1>
-          <p className="text-muted-foreground mt-2">Your universe of weather, summarized by AI</p>
+          <h1 className="text-5xl font-extrabold text-foreground drop-shadow-lg tracking-tight">WeatherVerse</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Your universe of weather, summarized by AI</p>
         </header>
-
         <form onSubmit={handleSearch} className="flex w-full gap-2">
           <Input
             type="text"
             placeholder="Search for a city..."
             value={searchCity}
             onChange={(e) => setSearchCity(e.target.value)}
-            className="flex-1 text-base bg-background/50 focus:bg-background/70"
+            className="flex-1 text-base bg-background/50 focus:bg-background/70 shadow-md"
             disabled={loading}
+            autoFocus
           />
-          <Button type="submit" size="icon" disabled={loading}>
+          <Button type="submit" size="icon" disabled={loading} className="shadow-md">
             {loading ? <LoaderCircle className="animate-spin" /> : <Search />}
           </Button>
         </form>
-
         <div className="animate-in fade-in zoom-in-95 duration-500">
           {loading && !weatherData && <WeatherCardSkeleton />}
           {weatherData && (
-            <Card className="glassmorphism text-foreground w-full overflow-hidden">
+            <Card className="glassmorphism text-foreground w-full overflow-hidden shadow-2xl border-2 border-primary/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-3xl">
                   <MapPin className="h-7 w-7"/>
-                  {weatherData.city}
+                  {weatherData.city}, <span className="text-xl font-light">{weatherData.country}</span>
                 </CardTitle>
-                <CardDescription className="text-lg">{weatherData.conditions}</CardDescription>
+                <CardDescription className="text-lg flex items-center gap-2">
+                  {weatherData.conditions}
+                  {weatherData.icon && (
+                    <Image
+                      src={`https://openweathermap.org/img/wn/${weatherData.icon}@2x.png`}
+                      alt={weatherData.conditions}
+                      width={48}
+                      height={48}
+                      className="inline-block align-middle"
+                    />
+                  )}
+                </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-6 text-center">
-                 {weatherData.icon && (
-                  <Image
-                    src={`https://openweathermap.org/img/wn/${weatherData.icon}@4x.png`}
-                    alt={weatherData.conditions}
-                    width={128}
-                    height={128}
-                    className="h-32 w-32 drop-shadow-lg"
-                  />
-                )}
-                <p className="text-7xl font-bold">{weatherData.temperature}°C</p>
-                <div className="flex w-full justify-around">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="h-6 w-6 text-primary" />
-                    <p className="text-lg">{weatherData.humidity}%</p>
+                <p className="text-7xl font-extrabold drop-shadow-lg">{weatherData.temperature}°C</p>
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Feels Like</span>
+                    <span className="text-lg font-semibold">{weatherData.feelsLike}°C</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Wind className="h-6 w-6 text-primary" />
-                    <p className="text-lg">{weatherData.windSpeed} km/h</p>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Pressure</span>
+                    <span className="text-lg font-semibold">{weatherData.pressure} hPa</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Humidity</span>
+                    <span className="text-lg font-semibold">{weatherData.humidity}%</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Wind</span>
+                    <span className="text-lg font-semibold">{weatherData.windSpeed} km/h</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Min/Max</span>
+                    <span className="text-lg font-semibold">{weatherData.tempMin}°C / {weatherData.tempMax}°C</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Visibility</span>
+                    <span className="text-lg font-semibold">{(weatherData.visibility / 1000).toFixed(1)} km</span>
+                  </div>
+                </div>
+                <div className="flex w-full justify-center gap-8 mt-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Sunrise</span>
+                    <span className="text-lg font-semibold">{new Date(weatherData.sunrise * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs text-muted-foreground">Sunset</span>
+                    <span className="text-lg font-semibold">{new Date(weatherData.sunset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
               </CardContent>
-              {/* <CardFooter className="flex-col items-start gap-4 pt-6">
-                <Separator />
-                <h3 className="flex items-center gap-2 text-xl font-semibold">
-                  <BrainCircuit className="h-6 w-6 text-primary" />
-                  AI Summary
-                </h3>
-                {loadingAi ? (
-                  <div className="w-full space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-5/6" />
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">{aiSummary}</p>
-                )}
-              </CardFooter> */}
             </Card>
           )}
         </div>
